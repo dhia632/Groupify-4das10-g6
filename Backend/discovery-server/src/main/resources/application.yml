@@ -1,0 +1,47 @@
+# =====================================================================
+# Discovery Server (Eureka) de Groupify
+# Tableau de bord : http://localhost:8761
+# Les 6 microservices et l'API Gateway s'y enregistrent avec leur
+# spring.application.name ; la Gateway les appelle ensuite par lb://<nom>.
+# =====================================================================
+server:
+  port: ${PORT:8761}
+
+spring:
+  application:
+    name: discovery-server
+
+eureka:
+  instance:
+    hostname: ${EUREKA_HOSTNAME:localhost}
+  client:
+    # Un seul serveur Eureka : il ne s'enregistre pas lui-même
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    # En développement on retire vite les services arrêtés (pas de mode "self-preservation")
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 10000
+    # Le serveur démarre sans attendre de pairs
+    wait-time-in-ms-when-sync-empty: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+info:
+  app:
+    name: Groupify Discovery Server
+    description: Registre Eureka des microservices Auth, Profiling, Course/Group, Gamification, Analytics et ML Clustering
+
+logging:
+  level:
+    com.netflix.eureka: INFO
+    com.netflix.discovery: WARN

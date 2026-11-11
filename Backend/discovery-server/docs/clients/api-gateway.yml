@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------
+# api-gateway : à ajouter dans src/main/resources/application.yml
+# Dépendance Maven : spring-cloud-starter-netflix-eureka-client
+# ---------------------------------------------------------------------
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway          # nom vu dans Eureka et utilisé par la Gateway (lb://api-gateway)
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 10
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30

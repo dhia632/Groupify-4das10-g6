@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------------
+# Routes de l'API Gateway vers les 6 microservices, résolues par Eureka.
+# "lb://<nom>" = la Gateway demande à Eureka l'adresse du service
+# (spring.application.name) puis répartit la charge entre ses instances.
+# À placer dans api-gateway/src/main/resources/application.yml
+# ---------------------------------------------------------------------
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: lb://auth-service
+              predicates: [ "Path=/api/auth/**" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: authCB, fallbackUri: "forward:/fallback/auth-service" }
+
+            - id: profiling-service
+              uri: lb://profiling-service
+              predicates: [ "Path=/api/profiles/**" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: profilingCB, fallbackUri: "forward:/fallback/profiling-service" }
+
+            - id: course-group-service
+              uri: lb://course-group-service
+              predicates: [ "Path=/api/courses/**,/api/groups/**" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: courseGroupCB, fallbackUri: "forward:/fallback/course-group-service" }
+
+            - id: gamification-service
+              uri: lb://gamification-service
+              predicates: [ "Path=/api/gamification/**" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: gamificationCB, fallbackUri: "forward:/fallback/gamification-service" }
+
+            - id: analytics-service
+              uri: lb://analytics-service
+              predicates: [ "Path=/api/analytics/**" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: analyticsCB, fallbackUri: "forward:/fallback/analytics-service" }
+
+            - id: ml-clustering-engine
+              uri: lb://ml-clustering-engine
+              predicates: [ "Path=/api/clustering/**" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: clusteringCB, fallbackUri: "forward:/fallback/ml-clustering-engine" }
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}

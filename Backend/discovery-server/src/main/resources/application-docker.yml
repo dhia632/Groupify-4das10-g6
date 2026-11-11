@@ -1,0 +1,4 @@
+# Profil "docker" : dans docker-compose, le conteneur s'appelle discovery-server
+eureka:
+  instance:
+    hostname: discovery-server

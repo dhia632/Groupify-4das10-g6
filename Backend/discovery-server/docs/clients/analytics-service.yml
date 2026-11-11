@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------
+# analytics-service : à ajouter dans src/main/resources/application.yml
+# Dépendance Maven : spring-cloud-starter-netflix-eureka-client
+# ---------------------------------------------------------------------
+server:
+  port: 8085
+
+spring:
+  application:
+    name: analytics-service          # nom vu dans Eureka et utilisé par la Gateway (lb://analytics-service)
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 10
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
