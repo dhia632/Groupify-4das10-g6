@@ -1,0 +1,21 @@
+.auth { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 1fr; background: var(--bg); }
+.hero {
+  background: var(--yellow); border-right: var(--border); padding: 48px; display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; overflow: hidden;
+}
+.hero h1 { font-size: 42px; line-height: 1.1; max-width: 520px; }
+.hero p { font-size: 16px; max-width: 470px; margin-top: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 26px; font-style: italic; }
+.blob { position: absolute; border-radius: 50%; border: var(--border); }
+.b1 { width: 220px; height: 220px; background: var(--orange-soft); right: -60px; top: 120px; }
+.b2 { width: 120px; height: 120px; background: var(--blue-soft); right: 140px; bottom: 60px; }
+.b3 { width: 70px; height: 70px; background: var(--pink-soft); right: 60px; bottom: 210px; }
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; position: relative; z-index: 1; }
+.feature { background: #fff; border: var(--border); border-radius: 14px; padding: 12px; font-size: 12px; font-weight: 600; }
+.feature .mi { color: var(--orange); display: block; margin-bottom: 4px; }
+.form-side { display: flex; align-items: center; justify-content: center; padding: 40px; }
+.form-card { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; box-shadow: var(--shadow); }
+.demo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.demo button { justify-content: flex-start; }
+.err { background: var(--pink-soft); border: var(--border); border-radius: 12px; padding: 8px 12px; font-size: 13px; }
+@media (max-width: 900px) { .auth { grid-template-columns: 1fr; } .hero { display: none; } }

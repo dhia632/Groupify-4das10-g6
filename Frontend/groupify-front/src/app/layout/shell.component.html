@@ -1,0 +1,77 @@
+<div class="frame">
+  <!-- ============================================================ barre latérale -->
+  <aside class="sidebar" [class.open]="sidebarOpen()">
+    <a class="logo" [routerLink]="session.homeFor(session.role())">
+      <app-mascot [size]="38" />
+      <span>Groupify</span>
+    </a>
+
+    <div class="me">
+      @if (session.role() === 'STUDENT') {
+        <span class="emoji-avatar lg">{{ avatarCode() | emoji:'avatar' }}</span>
+      } @else {
+        <span class="initials">{{ session.user()?.displayName | initials }}</span>
+      }
+      <strong>{{ session.user()?.displayName }}</strong>
+      <span class="muted small">{{ roleLabel() }}</span>
+    </div>
+
+    <nav>
+      @for (section of nav(); track section.title) {
+        <div class="nav-title">{{ section.title }}</div>
+        @for (item of section.items; track item.link) {
+          <a class="nav-item" [routerLink]="item.link" routerLinkActive="active">
+            <span class="mi">{{ item.icon }}</span>
+            <span>{{ item.label }}</span>
+          </a>
+        }
+      }
+    </nav>
+
+    <button class="nav-item logout" (click)="session.logout()">
+      <span class="mi">logout</span><span>Se déconnecter</span>
+    </button>
+  </aside>
+
+  <!-- ============================================================ contenu -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn burger" (click)="sidebarOpen.set(!sidebarOpen())"><span class="mi">menu</span></button>
+      <div class="grow">
+        <h2>{{ title() }}</h2>
+        @if (service()) { <span class="svc">microservice : {{ service() }}</span> }
+      </div>
+      @if (gamification.demoMode()) {
+        <button class="chip yellow clickable" title="Le Gamification Service ne répond pas : données de démonstration" (click)="gamification.retryBackend()">
+          <span class="mi">cloud_off</span> Démo gamification · réessayer
+        </button>
+      }
+      <label class="search">
+        <span class="mi">search</span>
+        <input placeholder="Rechercher…" />
+      </label>
+      <button class="icon-btn" title="Notifications"><span class="mi">notifications</span></button>
+      <div class="user-menu">
+        <button class="icon-btn" (click)="menuOpen.set(!menuOpen())" title="Compte"><span class="mi">account_circle</span></button>
+        @if (menuOpen()) {
+          <div class="dropdown card pop">
+            <div class="bold">{{ session.user()?.displayName }}</div>
+            <div class="muted small">{{ session.user()?.username }} · {{ roleLabel() }}</div>
+            @if (localMode) {
+              <div class="dashed-h"></div>
+              <div class="small bold">Changer de compte (démo)</div>
+              @for (a of demoAccounts; track a.username) {
+                <button class="btn ghost sm full" (click)="switchTo(a.username)">{{ a.label }}</button>
+              }
+            }
+            <div class="dashed-h"></div>
+            <button class="btn sm full" (click)="session.logout()"><span class="mi">logout</span> Déconnexion</button>
+          </div>
+        }
+      </div>
+    </header>
+    <section class="content">
+      <router-outlet />
+    </section>
+  </main>
+</div>

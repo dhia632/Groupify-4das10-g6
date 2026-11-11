@@ -1,0 +1,130 @@
+<div class="page">
+  <div class="page-title">
+    <div>
+      <a routerLink="/app/courses" class="small muted"><span class="mi" style="font-size:16px">arrow_back</span> Modules</a>
+      <h1>{{ project()?.title ?? 'Projet' }}</h1>
+      <p>Constitution automatique des groupes · Course / Group Service + ML Clustering Engine</p>
+    </div>
+    @if (request(); as r) {
+      <span class="chip" [class.green]="r.status === 'PUBLISHED'" [class.yellow]="r.status === 'PROPOSED'" [class.blue]="running()">
+        Demande n° {{ r.id }} · {{ r.status }}
+      </span>
+    }
+  </div>
+
+  <!-- ===================================================== paramètres -->
+  @if (!published()) {
+    <div class="card lift">
+      <div class="card-head">
+        <h3><span class="mi">tune</span> Critères et poids</h3>
+        <span class="chip" [class.pink]="totalWeight() !== 100" [class.green]="totalWeight() === 100">Total : {{ totalWeight() }} %</span>
+      </div>
+      <div class="weights">
+        <div class="w"><div class="row between"><b>🎓 Résultats (GPA)</b><span class="chip orange">{{ weights.gpa }} %</span></div><input type="range" min="0" max="100" step="5" [(ngModel)]="weights.gpa" /><span class="small muted">Équilibrer la moyenne entre les groupes</span></div>
+        <div class="w"><div class="row between"><b>🛠️ Compétences</b><span class="chip orange">{{ weights.skills }} %</span></div><input type="range" min="0" max="100" step="5" [(ngModel)]="weights.skills" /><span class="small muted">Couvrir toutes les compétences par groupe</span></div>
+        <div class="w"><div class="row between"><b>🧠 Styles d'apprentissage</b><span class="chip orange">{{ weights.styles }} %</span></div><input type="range" min="0" max="100" step="5" [(ngModel)]="weights.styles" /><span class="small muted">Mélanger les manières de travailler (optionnel)</span></div>
+        <div class="w"><div class="row between"><b>💡 Centres d'intérêt</b><span class="chip orange">{{ weights.interests }} %</span></div><input type="range" min="0" max="100" step="5" [(ngModel)]="weights.interests" /><span class="small muted">Donner un terrain commun au groupe</span></div>
+      </div>
+      <div class="row wrap mt">
+        <div class="field grow" style="min-width:260px">
+          <label>Algorithme</label>
+          <select class="input" [(ngModel)]="algorithm">
+            @for (a of algorithms(); track a.code) { <option [value]="a.code">{{ a.name }}</option> }
+          </select>
+        </div>
+        <div class="field" style="width:160px">
+          <label>Taille des groupes</label>
+          <input class="input" type="number" min="2" max="8" [(ngModel)]="groupSize" />
+        </div>
+        <button class="btn primary" style="align-self:flex-end" [disabled]="launching() || running()" (click)="launch()">
+          <span class="mi">auto_awesome</span> {{ running() ? 'Calcul en cours…' : 'Lancer la constitution' }}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (running()) {
+    <div class="card yellow row pop" style="gap:16px">
+      <app-mascot [size]="60" />
+      <div class="grow">
+        <b>Le ML Clustering Engine travaille…</b>
+        <p class="small muted">clustering.requested publié → profilage (k-means) → répartition stratifiée → équilibrage → clustering.completed</p>
+        <div class="bar mt-s"><span class="indeterminate"></span></div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================================================== résultats ML -->
+  @if (job(); as j) {
+    <div class="grid g-4">
+      <div class="card green"><div class="stat-value">{{ j.metrics.gpaStdDev | number:'1.2-2' }}</div><div class="stat-label">Écart-type des moyennes de GPA (↓)</div></div>
+      <div class="card blue"><div class="stat-value">{{ j.metrics.skillCoverage }} %</div><div class="stat-label">Couverture des compétences</div></div>
+      <div class="card purple"><div class="stat-value">{{ j.metrics.diversityIndex * 100 | number:'1.0-0' }} %</div><div class="stat-label">Diversité des profils</div></div>
+      <div class="card orange"><div class="stat-value">{{ j.metrics.randomBaselineGain > 0 ? '−' : '' }}{{ j.metrics.randomBaselineGain }} %</div><div class="stat-label">d'écart de GPA vs hasard</div></div>
+    </div>
+
+    <div class="grid g-3">
+      <div class="card span-2">
+        <div class="card-head"><h3><span class="mi">scatter_plot</span> Profils types (ACP 2D)</h3><span class="card-sub">{{ j.algorithm }} · k = {{ j.k }} · job {{ j.id }}</span></div>
+        <app-scatter [points]="points()" />
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Profils identifiés</h3></div>
+        <div class="col">
+          @for (c of j.clusters; track c.clusterId) {
+            <div class="row"><span class="sw" [style.background]="c.color"></span><span class="grow bold">{{ c.label }}</span><span class="chip">{{ c.size }}</span></div>
+          }
+        </div>
+        <div class="dashed-h"></div>
+        <p class="small muted">Chaque groupe reçoit à tour de rôle un représentant de chaque profil type : groupes hétérogènes à l'intérieur, équilibrés entre eux.</p>
+        <p class="small muted mt-s">Calcul terminé le {{ j.finishedAt | date:'dd/MM HH:mm:ss' }}</p>
+      </div>
+    </div>
+  }
+
+  <!-- ===================================================== groupes -->
+  @if (groups().length) {
+    <div class="card">
+      <div class="card-head">
+        <h3><span class="mi">groups</span> {{ published() ? 'Groupes publiés' : 'Groupes proposés' }} ({{ groups().length }})</h3>
+        @if (!published()) {
+          <button class="btn primary" (click)="publish()"><span class="mi">publish</span> Valider et publier</button>
+        } @else {
+          <span class="chip green">✅ Publiés · visibles par les étudiants</span>
+        }
+      </div>
+      <div class="board">
+        @for (g of groups(); track g.id) {
+          <div class="group">
+            <div class="row between">
+              <b>{{ g.name }}</b>
+              <span class="chip yellow">⭐ {{ g.qualityScore }}</span>
+            </div>
+            <div class="small muted">GPA moyen {{ avgGpa(g) | number:'1.1-1' }} · {{ clustersIn(g) }} profils différents</div>
+            <div class="members">
+              @for (m of g.memberIds; track m) {
+                <div class="member" (mouseenter)="highlight.set(m)" (mouseleave)="highlight.set(null)">
+                  <span class="sw" [style.background]="clusterColor()[m]?.color || '#ccc'" [title]="clusterColor()[m]?.label"></span>
+                  <span class="grow">{{ nameOf(m) }}</span>
+                  <span class="small muted">{{ gpaOf(m) | number:'1.1-1' }}</span>
+                  @if (!published()) {
+                    <select class="mini" [(ngModel)]="moveTarget[m]" (ngModelChange)="move(g, m)" title="Déplacer vers…">
+                      <option [ngValue]="undefined">↔</option>
+                      @for (o of groups(); track o.id) { @if (o.id !== g.id) { <option [ngValue]="o.id">{{ o.name }}</option> } }
+                    </select>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  } @else if (!running() && !request()) {
+    <div class="card center col" style="align-items:center;padding:36px">
+      <app-mascot [size]="80" />
+      <h2>Aucune constitution lancée</h2>
+      <p class="muted">Réglez les poids puis lancez le calcul : le résultat arrive en quelques secondes.</p>
+    </div>
+  }
+</div>

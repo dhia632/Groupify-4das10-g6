@@ -1,0 +1,165 @@
+@if (loading()) {
+  <div class="grid g-4">
+    @for (i of [1, 2, 3, 4]; track i) { <div class="skeleton" style="height:110px"></div> }
+  </div>
+} @else {
+  <div class="layout">
+    <!-- ======================================================== colonne principale -->
+    <div class="main-col">
+      <div class="hello">
+        <h1>Bonjour {{ firstName() }} !</h1>
+        <app-mascot [size]="62" />
+        <div class="speech">
+          @if ((player()?.currentStreakDays ?? 0) > 1) {
+            Tu es en feu 🔥 Garde ta série de <b>{{ player()?.currentStreakDays }} jours</b> !
+          } @else {
+            Une contribution aujourd'hui et ta série démarre 🚀
+          }
+        </div>
+      </div>
+
+      <!-- cartes statistiques -->
+      <div class="stats">
+        <div class="card yellow stat">
+          <div><div class="stat-value">{{ player()?.totalPoints | number }} XP</div><div class="stat-label">Points actuels</div></div>
+          <span class="big-emoji">🏅</span>
+        </div>
+        <div class="card blue stat">
+          <div><div class="stat-value">{{ player()?.level?.name }}</div><div class="stat-label">Niveau {{ player()?.level?.rank }}</div></div>
+          <span class="big-emoji">{{ player()?.level?.rank | emoji:'level' }}</span>
+        </div>
+        <div class="card yellow stat">
+          <div><div class="stat-value">{{ player()?.currentStreakDays }} jours</div><div class="stat-label">Série</div></div>
+          <span class="big-emoji">🔥</span>
+        </div>
+        <div class="card pink stat">
+          <div><div class="stat-value">#{{ myRank() ?? '–' }}</div><div class="stat-label">Rang de l'équipe</div></div>
+          <span class="big-emoji">🏆</span>
+        </div>
+      </div>
+
+      <!-- progression -->
+      <div class="card progress-card">
+        <div class="card-head">
+          <div>
+            <h3>Progression</h3>
+            <span class="card-sub">Reprends là où ton équipe s'est arrêtée</span>
+          </div>
+          <a routerLink="/app/projects" class="icon-btn"><span class="mi">arrow_forward</span></a>
+        </div>
+        <div class="progress-body">
+          <a class="project-tile" routerLink="/app/projects">
+            <strong>{{ team()?.team?.name ?? 'Mon équipe' }}</strong>
+            <span class="play"><span class="mi fill">play_arrow</span></span>
+            <span class="small">Livrable {{ (team()?.deliverablesSubmitted ?? 0) + 1 }} sur {{ team()?.deliverablesTotal ?? 0 }}</span>
+          </a>
+          <div class="progress-lines">
+            <div>
+              <div class="row between"><span class="bold">Niveau suivant · {{ player()?.nextLevel?.name ?? 'max' }}</span><span class="small bold">{{ (player()?.progressToNextLevel ?? 0) * 100 | number:'1.0-0' }} %</span></div>
+              <div class="bar mt-s"><span [style.width.%]="(player()?.progressToNextLevel ?? 0) * 100"></span></div>
+              <div class="hint"><span class="coin">●</span> encore {{ pointsToNext() }} XP</div>
+            </div>
+            <div>
+              <div class="row between"><span class="bold">Projet de l'équipe</span><span class="small bold">{{ team()?.team?.progressPercent ?? 0 | number:'1.0-0' }} %</span></div>
+              <div class="bar mt-s"><span [style.width.%]="team()?.team?.progressPercent ?? 0"></span></div>
+              <div class="hint"><span class="coin">●</span> +30 XP au prochain livrable rendu à temps</div>
+            </div>
+            <div class="row" style="justify-content:flex-end"><a routerLink="/app/projects" class="btn primary sm">Continuer</a></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid g-2">
+        <!-- prochain badge -->
+        <div class="card challenge">
+          <div class="card-head">
+            <div><h3>Prochain badge</h3><span class="card-sub">Coopère et gagne des points bonus</span></div>
+            <a routerLink="/app/badges" class="icon-btn"><span class="mi">arrow_forward</span></a>
+          </div>
+          @if (nextBadge(); as nb) {
+            <div class="row">
+              <span class="badge-big">{{ nb.badge.code | emoji:'badge' }}</span>
+              <div class="grow">
+                <div class="bold">{{ nb.badge.name }}</div>
+                <div class="small muted">{{ nb.badge.description }}</div>
+                <div class="bar mt-s"><span [style.width.%]="nb.ratio * 100"></span></div>
+                <div class="small mt-s"><b>{{ nb.current }}/{{ nb.target }}</b> · +{{ nb.badge.rewardPoints }} XP</div>
+              </div>
+            </div>
+          } @else {
+            <p class="muted">Tous les badges sont débloqués, bravo ! 🎉</p>
+          }
+          <div class="challenge-foot">
+            <app-mascot [size]="54" />
+            <a routerLink="/app/team" class="chip yellow">🤝 Envoyer un kudos à un coéquipier</a>
+          </div>
+        </div>
+
+        <!-- contribution -->
+        <div class="card">
+          <div class="card-head"><h3>Ma contribution</h3></div>
+          <div class="row efficiency">
+            <ul>
+              <li><span class="dot" style="background:var(--orange)"></span> Contributions : <b>{{ countOf('CONTRIBUTION_RECORDED') }}</b></li>
+              <li><span class="dot" style="background:var(--yellow)"></span> Kudos reçus : <b>{{ countOf('KUDOS_RECEIVED') }}</b></li>
+              <li><span class="dot" style="background:var(--ink)"></span> Badges : <b>{{ player()?.badgesCount }}</b></li>
+            </ul>
+            <app-donut [value]="myShare()" [size]="124" />
+          </div>
+          <div class="dashed-h"></div>
+          <div class="row between small">
+            <span>Part des points de l'équipe</span>
+            <span>Jours actifs ce mois : <b>{{ activeDays().length }}</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== colonne droite -->
+    <div class="side-col">
+      <div class="card yellow">
+        <div class="card-head">
+          <h3><span class="mi">calendar_month</span> Activité du mois</h3>
+          <span class="chip">{{ today | date: 'MMMM' }}</span>
+        </div>
+        <app-activity-calendar [activeDays]="activeDays()" />
+        <div class="small mt-s">Série actuelle : <b>{{ player()?.currentStreakDays }} jours 🔥</b></div>
+      </div>
+
+      <div class="card leaderboard">
+        <div class="card-head">
+          <div><h3>Classement des équipes</h3><span class="card-sub">Les équipes sont comparées, jamais les individus</span></div>
+        </div>
+        @if (board().length) {
+          <div class="podium">
+            @for (t of podium(); track t.teamId) {
+              <div class="pod" [class]="'pod pos' + t.rank" [class.mine]="t.teamId === team()?.team?.id">
+                <span class="emoji-avatar">{{ t.emblemUrl | emoji:'emblem' }}</span>
+                <span class="pod-name">{{ t.name }}</span>
+                <div class="step">
+                  <span class="step-rank">{{ t.rank }}</span>
+                  <span class="small">{{ t.totalPoints }} XP</span>
+                  <span class="small">{{ t.progressPercent | number:'1.0-0' }} %</span>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="list">
+            @for (t of rest(); track t.teamId) {
+              <div class="list-row" [class.mine]="t.teamId === team()?.team?.id">
+                <span class="r">{{ t.rank }}</span>
+                <span>{{ t.emblemUrl | emoji:'emblem' }}</span>
+                <span class="grow bold">{{ t.name }}</span>
+                <span class="small">📈 {{ t.progressPercent | number:'1.0-0' }} %</span>
+                <span class="small bold">{{ t.totalPoints }} XP</span>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty">Pas encore d'équipe publiée.</p>
+        }
+        <a routerLink="/app/leaderboard" class="btn sm mt-s" style="width:100%">Voir tout le classement</a>
+      </div>
+    </div>
+  </div>
+}
