@@ -1,3 +1,189 @@
+# Plateforme de constitution automatique de groupes d'apprentissage collaboratif
+
+Projet du module AWD (ESPRIT, année universitaire 2026-2027) : une application web en architecture microservices qui profile les étudiants, forme par apprentissage non supervisé des groupes hétérogènes et équilibrés, puis entretient la motivation de chaque équipe grâce à la gamification.
+
+- Équipe : [Groupify]
+- Classe : [4DAS10]
+
+---
+
+## 1. Description du projet
+
+### Problème
+
+Le travail en groupe améliore les résultats et développe les compétences relationnelles, mais seulement si les équipes sont bien composées. Aujourd'hui, les groupes se forment surtout de deux façons :
+
+- le libre choix, qui reproduit les affinités et les cercles d'amis ;
+- la composition manuelle par l'enseignant, lente au-delà de quelques dizaines d'étudiants et exposée aux biais.
+
+Aucune des deux ne garantit des équipes comparables entre elles.
+
+### Solution
+
+Chaque étudiant renseigne un profil multi-critères. Un moteur d'apprentissage non supervisé identifie des profils types, puis répartit les étudiants pour que chaque groupe soit diversifié à l'intérieur et que tous les groupes soient de niveau comparable. L'enseignant valide, ajuste si besoin, puis publie. La gamification entretient ensuite l'engagement.
+
+### Acteurs
+
+| Acteur | Rôle |
+|---|---|
+| Étudiant | Complète son profil, découvre son équipe, suit sa contribution, gagne des badges |
+| Enseignant | Lance une constitution de groupes, choisit les critères et leur poids, valide et ajuste le résultat, suit les équipes |
+| Administration | Consulte des indicateurs agrégés (équilibre des groupes, engagement) par classe ou par promotion |
+
+### Fonctionnalités principales
+
+1. Gestion du profil étudiant : GPA, compétences, styles d'apprentissage, centres d'intérêt.
+2. Constitution automatique des groupes : clustering des profils, répartition hétérogène, équilibrage.
+3. Indicateurs de qualité par groupe et comparaison avec une répartition aléatoire.
+4. Validation humaine : l'enseignant peut déplacer un étudiant et voit l'effet sur l'équilibre. Rien n'est publié sans sa validation.
+5. Historique des versions de groupes.
+6. Gamification : avatars, badges, points, classement des équipes (et non des individus).
+7. Tableaux de bord pour l'enseignant, l'étudiant et l'administration.
+
+
+
+---
+
+## 2. Architecture globale
+
+```
+                        +-----------------------------+
+                        |  Front-end Angular          |
+                        +--------------+--------------+
+                                       |
+                                       v
+ +-------------+          +------------------------------+          +-------------+
+ |  Keycloak   |<-------->|  API Gateway                 |<-------->|   Eureka    |
+ |  (OAuth2/   |  JWT     |  (Spring Cloud Gateway)      | découverte|  (registre) |
+ |   JWT)      |          +--------------+---------------+          +-------------+
+ +-------------+                         |                          +-------------+
+                                         |                          |   Config    |
+        +------------+------------+------+-----+------------+       |   Server    |
+        v            v            v            v            v       +-------------+
+  +-----------+ +-----------+ +-----------+ +-----------+ +-----------+ +-----------+
+  |   Auth    | |   User /  | |  Course / | |    ML     | |Gamification| | Analytics |
+  |  Service  | | Profiling | |   Group   | | Clustering| |   Engine   | |  Service  |
+  | (Keycloak)| | (Spring)  | |(Spring,   | | (Python,  | | (Spring)   | | (Spring)  |
+  |           | |           | |  MySQL)   | |  FastAPI) | |            | |           |
+  +-----------+ +-----------+ +-----------+ +-----------+ +-----------+ +-----------+
+                                       \________ REST / OpenFeign ________/
+                                       \__ événements : Kafka ou RabbitMQ __/
+```
+
+Principes :
+
+- Chaque microservice correspond à une capacité métier (contexte borné) et possède sa propre base de données. Aucune base n'est partagée.
+- Les services communiquent en synchrone (REST avec OpenFeign) quand la réponse est nécessaire tout de suite, et en asynchrone (événements) quand les autres services peuvent réagir plus tard.
+- Tout le trafic externe passe par l'API Gateway.
+- Toute l'application est conteneurisée avec Docker et se lance avec Docker Compose.
+
+---
+
+
+
+# Course / Group Service
+
+Microservice de la plateforme de constitution automatique de groupes d'apprentissage collaboratif (module AWD, ESPRIT, année universitaire 2026-2027).
+
+Responsable du microservice : [Ons Ben Said]
+
+---
+
+## 1. Rôle du microservice
+
+Le Course / Group Service organise le cadre pédagogique et garde la trace de la constitution des groupes. Il fait le lien entre l'enseignant, qui lance et valide la constitution, et le moteur de Machine Learning, qui calcule la répartition.
+
+Ce que le service gère :
+
+- les modules et les classes ;
+- les projets pour lesquels des groupes doivent être formés ;
+- les demandes de constitution lancées par l'enseignant, avec les poids des critères choisis ;
+- les versions de groupes : la proposition de l'algorithme, puis chaque version ajustée ;
+- les groupes d'une version et l'affectation des étudiants dans ces groupes ;
+- les ajustements manuels faits par l'enseignant ;
+- la publication d'une version de groupes.
+
+Ce que le service ne gère pas :
+
+- le calcul des groupes, qui appartient au ML Clustering Engine ;
+- les profils des étudiants, qui appartiennent au User / Profiling Service ;
+- les badges, points et avatars, qui appartiennent au Gamification Engine ;
+- les tableaux de bord, qui appartiennent à l'Analytics Service.
+
+---
+
+## 2. Choix technologiques
+
+| Élément | Choix | Justification |
+|---|---|---|
+| Langage et framework | Java, Spring Boot | Cohérent avec la stack du module (écosystème Spring Cloud) et avec le reste de l'équipe |
+| Base de données | MySQL | Les données sont fortement reliées (projet, demande, version, groupe, affectation). Le modèle relationnel, les clés étrangères et les transactions garantissent la cohérence de l'historique des versions |
+| Accès aux données | Spring Data JPA | Correspondance entre les classes et les tables, dépôts prêts à l'emploi |
+| Appels vers d'autres services | OpenFeign | Communication synchrone simple et déclarative |
+| Événements | Kafka ou RabbitMQ (à confirmer avec l'équipe) | Communication asynchrone |
+| Découverte et configuration | Client Eureka, client Config Server | Enregistrement du service et configuration centralisée |
+| Sécurité | Spring Security, validation des jetons JWT émis par Keycloak | Seul l'enseignant peut lancer, ajuster et publier |
+| Résilience | Délai limite, nouvelles tentatives et coupe-circuit (par exemple Resilience4j) | Le service reste disponible quand un autre service est en panne |
+
+Le service n'a qu'une seule base MySQL, qu'il est le seul à utiliser. Les autres services n'y accèdent jamais directement : ils passent par son API ou par ses événements.
+
+---
+
+### 3.Les classes
+
+| Classe | Attributs | Description |
+|---|---|---|
+| Module | id (Long), code (String), intitule (String), semestre (String) | La matière enseignée, par exemple AWD |
+| Classe | id (Long), nom (String), niveau (String), anneeUniversitaire (String) | Le groupe d'étudiants d'une filière, par exemple 4DS1 |
+| Projet | id (Long), titre (String), dateDebut (LocalDate), dateLimite (LocalDate), tailleMin (Integer), tailleMax (Integer) | Le travail pour lequel on forme des groupes. Les tailles minimale et maximale servent de contraintes à l'algorithme |
+| DemandeConstitution | id (Long), dateDemande (LocalDateTime), nombreGroupes (Integer), poidsCriteres (String), statut (String) | L'ordre « forme-moi les groupes » donné par l'enseignant, avec les poids choisis pour chaque critère |
+| VersionGroupes | id (Long), numero (Integer), dateCreation (LocalDateTime), source (String), publiee (Boolean) | Une photo de la répartition à un moment donné. La version 1 vient de l'algorithme, les suivantes des ajustements de l'enseignant |
+| Groupe | id (Long), nom (String), statut (String), ecartTypeGpa (Double), indiceDiversite (Double) | Une équipe au sein d'une version |
+| Affectation | id (Long), etudiantId (Long), origine (String), dateAffectation (LocalDateTime) | La place d'un étudiant dans un groupe |
+| AjustementManuel | id (Long), etudiantId (Long), groupeSource (Long), groupeCible (Long), motif (String), date (LocalDateTime) | Un déplacement d'étudiant fait à la main par l'enseignant |
+
+## 4. Contrat d'API REST
+
+Toutes les routes passent par l'API Gateway et exigent un jeton JWT valide. Elles commencent par /api. Les routes qui créent ou modifient des données sont réservées au rôle enseignant.
+
+| Méthode | URI | Description | Codes de réponse |
+|---|---|---|---|
+| GET | /api/modules | Lister les modules | 200 |
+| POST | /api/modules | Créer un module | 201, 400, 403 |
+| GET | /api/classes | Lister les classes | 200 |
+| POST | /api/projets | Créer un projet | 201, 400, 403, 404 (module ou classe introuvable) |
+| GET | /api/projets/{id} | Consulter un projet | 200, 404 |
+| POST | /api/projets/{id}/demandes | Lancer une constitution de groupes | 202, 400, 403, 404, 409 (une demande est déjà en cours) |
+| GET | /api/demandes/{id} | Consulter l'état d'une demande | 200, 404 |
+| GET | /api/demandes/{id}/versions | Lister les versions d'une demande | 200, 404 |
+| GET | /api/versions/{id}/groupes | Lister les groupes d'une version et leurs affectations | 200, 404 |
+| POST | /api/versions/{id}/ajustements | Déplacer un étudiant d'un groupe à un autre | 201, 400, 403, 404, 422 (déplacement invalide, par exemple taille maximale dépassée) |
+| POST | /api/versions/{id}/publication | Publier une version | 200, 403, 404, 409 (version déjà publiée) |
+
+Signification des codes : 200 succès, 201 ressource créée, 202 demande acceptée et en cours de traitement, 400 requête invalide, 403 rôle insuffisant, 404 ressource introuvable, 409 conflit avec l'état actuel, 422 requête valide mais impossible à appliquer.
+
+---
+## 5. Interactions avec les autres microservices
+
+### Communication synchrone (OpenFeign)
+
+| Service appelé | Données échangées | Pourquoi synchrone |
+|---|---|---|
+| User / Profiling Service | On envoie les identifiants des étudiants de la classe, on reçoit leurs profils | Les profils sont nécessaires avant de lancer le calcul |
+| ML Clustering Engine | On envoie les profils, les poids, le nombre et la taille des groupes, on reçoit la proposition de groupes et ses indicateurs | L'enseignant attend la proposition, qui prend quelques secondes |
+
+### Communication asynchrone (Kafka ou RabbitMQ)
+
+| Événement publié | Consommé par | Contenu |
+|---|---|---|
+| GroupesPubliés | Gamification Engine, Analytics Service, service de notifications | Identifiant du projet et de la version, liste des groupes et de leurs membres |
+| AjustementEffectué | Analytics Service | Identifiant de la version, étudiant déplacé, groupe source et groupe cible |
+
+Ces services n'ont pas besoin de répondre pour que la publication réussisse, d'où le mode asynchrone.
+
+
+
+---
 # ML-Clustering-Engine
 
 Microservice de groupement des étudiants dans le cadre d'un projet
