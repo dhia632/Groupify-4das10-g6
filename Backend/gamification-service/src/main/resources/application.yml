@@ -1,0 +1,118 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: gamification-service
+
+  # Config Server facultatif : le service démarre même s'il n'est pas lancé
+  config:
+    import: "optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/gamification_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: 5672
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # 3 tentatives puis rejet -> le message part dans la Dead Letter Queue
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2s
+          multiplier: 2
+
+  security:
+    oauth2:
+      # Validation des JWT émis par Keycloak (pas d'appel à Keycloak au démarrage grâce à jwk-set-uri)
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:groupify}
+          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:groupify}/protocol/openid-connect/certs
+      # Jeton technique (client_credentials) utilisé par Feign quand il n'y a pas d'utilisateur (ex. listener RabbitMQ)
+      client:
+        registration:
+          keycloak-service:
+            provider: keycloak
+            client-id: ${KEYCLOAK_CLIENT_ID:gamification-service}
+            client-secret: ${KEYCLOAK_CLIENT_SECRET:gamification-secret}
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            token-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:groupify}/protocol/openid-connect/token
+
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+      client:
+        config:
+          default:
+            connect-timeout: 2000
+            read-timeout: 2000
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 3s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Paramètres métier et messaging du service
+gamification:
+  rabbit:
+    exchange: platform.events
+    queue: gamification.queue
+    dead-letter-exchange: platform.events.dlx
+    dead-letter-queue: gamification.dlq
+    publish-enabled: true
+  rules:
+    contribution-points: 5
+    contribution-daily-cap: 50
+    profile-completed-points: 20
+    group-joined-points: 10
+    deliverable-on-time-points: 30
+    deliverable-late-points: 10
+    kudos-points: 5
+    kudos-weekly-quota: 3
+    daily-activity-points: 2

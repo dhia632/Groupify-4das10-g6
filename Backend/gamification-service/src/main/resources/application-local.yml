@@ -1,0 +1,36 @@
+# =====================================================================
+# Profil "local" : démo sans Docker. MySQL seul suffit.
+#  - Keycloak désactivé : un utilisateur fictif est injecté (voir LocalSecurityConfig)
+#  - RabbitMQ, Eureka et Config Server désactivés
+#  - Les événements sont simulés via /api/gamification/dev/events/{routingKey}
+# NE PAS utiliser en production.
+# =====================================================================
+
+spring:
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    # XAMPP / WAMP : utilisateur root sans mot de passe.
+    # Si votre MySQL a un mot de passe, mettez-le après les deux-points.
+    password: ${MYSQL_PASSWORD:}
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false       # pas d'écoute RabbitMQ
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
+
+eureka:
+  client:
+    enabled: false                # pas d'enregistrement Eureka
+
+management:
+  health:
+    rabbit:
+      enabled: false
+
+gamification:
+  rabbit:
+    publish-enabled: false        # pas de publication RabbitMQ

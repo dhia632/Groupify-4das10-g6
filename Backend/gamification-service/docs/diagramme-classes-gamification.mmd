@@ -1,0 +1,157 @@
+classDiagram
+    direction LR
+
+    class PlayerProfile {
+        -Long id
+        -String studentId
+        -String displayName
+        -int totalPoints
+        -LocalDateTime createdAt
+        -LocalDateTime lastActivityAt
+        -int currentStreakDays
+        +addPoints(int points) void
+        +progressToNextLevel() double
+    }
+
+    class Avatar {
+        -Long id
+        -String code
+        -String label
+        -String imageUrl
+        -int requiredLevel
+        -boolean active
+    }
+
+    class Level {
+        -Long id
+        -int rank
+        -String name
+        -int minPoints
+    }
+
+    class Badge {
+        -Long id
+        -String code
+        -String name
+        -String description
+        -String iconUrl
+        -BadgeCategory category
+        -int rewardPoints
+        -boolean active
+    }
+
+    class BadgeRule {
+        -Long id
+        -EventType triggerEvent
+        -ConditionType conditionType
+        -int threshold
+        -RuleScope scope
+        +isSatisfiedBy(int counter) boolean
+    }
+
+    class BadgeAward {
+        -Long id
+        -LocalDateTime awardedAt
+        -String sourceEventId
+        -boolean manual
+        -String awardedBy
+    }
+
+    class PointTransaction {
+        -Long id
+        -int points
+        -EventType reason
+        -String sourceEventId
+        -LocalDateTime createdAt
+    }
+
+    class Team {
+        -Long id
+        -Long groupId
+        -Long courseId
+        -String name
+        -int totalPoints
+        -int deliverablesTotal
+        -int deliverablesSubmitted
+        -int onTimeDeliveries
+        -LocalDateTime createdAt
+        +progressPercent() double
+        +rename(String name) void
+    }
+
+    class Emblem {
+        -Long id
+        -String code
+        -String imageUrl
+    }
+
+    class TeamMembership {
+        -Long id
+        -LocalDateTime joinedAt
+    }
+
+    class Kudos {
+        -Long id
+        -String message
+        -LocalDateTime createdAt
+    }
+
+    class ProcessedEvent {
+        -String eventId
+        -String eventType
+        -LocalDateTime processedAt
+    }
+
+    class EventType {
+        <<enumeration>>
+        PROFILE_COMPLETED
+        GROUP_JOINED
+        CONTRIBUTION_RECORDED
+        DELIVERABLE_SUBMITTED
+        KUDOS_RECEIVED
+        DAILY_ACTIVITY
+        BADGE_REWARD
+        MANUAL
+    }
+
+    class BadgeCategory {
+        <<enumeration>>
+        PARTICIPATION
+        COOPERATION
+        REGULARITY
+        DELIVERY
+    }
+
+    class ConditionType {
+        <<enumeration>>
+        FIRST_OCCURRENCE
+        COUNT_THRESHOLD
+        STREAK_DAYS
+        ON_TIME
+    }
+
+    class RuleScope {
+        <<enumeration>>
+        STUDENT
+        TEAM
+    }
+
+    PlayerProfile "0..*" --> "0..1" Avatar : choisit
+    PlayerProfile "0..*" ..> "1" Level : niveau calculé
+    Avatar "0..*" --> "1" Level : débloqué à
+    PlayerProfile "1" *-- "0..*" PointTransaction : historique
+    PlayerProfile "1" *-- "0..*" BadgeAward : obtient
+    BadgeAward "0..*" --> "1" Badge : concerne
+    Badge "1" *-- "1..*" BadgeRule : règles
+    Team "1" *-- "1..*" TeamMembership : membres
+    TeamMembership "0..*" --> "1" PlayerProfile : joueur
+    Team "0..*" --> "0..1" Emblem : emblème
+    PointTransaction "0..*" --> "0..1" Team : crédite
+    Kudos "0..*" --> "1" PlayerProfile : émetteur
+    Kudos "0..*" --> "1" PlayerProfile : destinataire
+    Kudos "0..*" --> "1" Team : équipe
+    Badge ..> BadgeCategory
+    BadgeRule ..> EventType
+    BadgeRule ..> ConditionType
+    BadgeRule ..> RuleScope
+    PointTransaction ..> EventType

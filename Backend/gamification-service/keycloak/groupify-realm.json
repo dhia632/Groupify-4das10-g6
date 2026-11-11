@@ -1,0 +1,84 @@
+{
+  "realm": "groupify",
+  "enabled": true,
+  "accessTokenLifespan": 1800,
+  "roles": {
+    "realm": [
+      { "name": "STUDENT", "description": "Étudiant membre d'un groupe" },
+      { "name": "TEACHER", "description": "Enseignant responsable de module" },
+      { "name": "ADMIN", "description": "Administration / département pédagogique" },
+      { "name": "SERVICE", "description": "Compte technique d'un microservice" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "angular-frontend",
+      "name": "Frontend Angular",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:4200/*"],
+      "webOrigins": ["http://localhost:4200"],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    },
+    {
+      "clientId": "gamification-service",
+      "name": "Gamification Service (appels Feign)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "gamification-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "student1",
+      "enabled": true,
+      "firstName": "Sara",
+      "lastName": "Ben Ali",
+      "email": "student1@groupify.tn",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "student1", "temporary": false }],
+      "realmRoles": ["STUDENT"]
+    },
+    {
+      "username": "student2",
+      "enabled": true,
+      "firstName": "Youssef",
+      "lastName": "Trabelsi",
+      "email": "student2@groupify.tn",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "student2", "temporary": false }],
+      "realmRoles": ["STUDENT"]
+    },
+    {
+      "username": "teacher1",
+      "enabled": true,
+      "firstName": "Amel",
+      "lastName": "Haddad",
+      "email": "teacher1@groupify.tn",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "teacher1", "temporary": false }],
+      "realmRoles": ["TEACHER"]
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "Groupify",
+      "email": "admin1@groupify.tn",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "admin1", "temporary": false }],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "service-account-gamification-service",
+      "enabled": true,
+      "serviceAccountClientId": "gamification-service",
+      "realmRoles": ["SERVICE"]
+    }
+  ]
+}

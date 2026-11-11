@@ -1,0 +1,39 @@
+# Infrastructure de développement : à lancer avant les microservices (qui tournent depuis l'IDE).
+#   docker compose -f docker-compose.dev.yml up -d
+services:
+
+  mysql:
+    image: mysql:8.4
+    container_name: groupify-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: groupify-rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # console web : http://localhost:15672 (guest / guest)
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    container_name: groupify-keycloak
+    command: start-dev --import-realm --http-port=8180
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8180"     # console : http://localhost:8180 (admin / admin)
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+
+volumes:
+  mysql-data:
