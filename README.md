@@ -480,6 +480,161 @@ analytics-service/
 Cette structure est indicative et doit être adaptée à l'organisation réelle du code.
 
 
+---
+
+# User / Profiling Service
+
+Microservice de la plateforme de constitution automatique de groupes d'apprentissage collaboratif (module AWD, ESPRIT, année universitaire 2026-2027).
+
+Responsable du microservice : [Votre nom]
+
+---
+
+## 1. Rôle du microservice
+
+Le User / Profiling Service collecte et conserve les informations qui décrivent chaque étudiant. Ces profils sont la matière première du moteur de clustering et de la constitution des groupes.
+
+Ce que le service gère :
+
+- les profils des étudiants : GPA, statut du profil et taux de complétion ;
+- les compétences, auto-évaluées par l'étudiant puis ajustables par l'enseignant ;
+- le style d'apprentissage, calculé à partir d'un questionnaire court ;
+- les centres d'intérêt ;
+- l'import de profils depuis un fichier CSV (données publiques ou synthétiques) ;
+- la mise à disposition des attributs normalisés aux autres services.
+
+Ce que le service ne gère pas :
+
+- l'authentification et les rôles, qui appartiennent à Keycloak ;
+- le calcul des groupes, qui appartient au ML Clustering Engine ;
+- les groupes et les projets, qui appartiennent au Course / Group Service ;
+- les badges et les points, qui appartiennent au Gamification Engine.
+
+Les attributs sensibles (genre, origine) ne sont pas stockés.
+
+---
+
+## 2. Choix technologiques
+
+| Élément | Choix | Justification |
+|---|---|---|
+| Langage et framework | Java 17, Spring Boot 4.0.9, Maven | Stack imposée par le module (écosystème Spring Cloud) |
+| Base de données | H2 | Base embarquée, sans installation, adaptée au volume modeste de profils et à la démonstration. Elle est propre au service |
+| Accès aux données | Spring Data JPA | Correspondance entre les classes et les tables, dépôts prêts à l'emploi |
+| Appels synchrones | OpenFeign, Eureka | Le service est appelé par ML Clustering et Course / Group ; il s'enregistre sous le nom `profiling-service` |
+| Événements | RabbitMQ | Communication asynchrone avec Auth, Gamification et Analytics |
+| Documentation | Swagger (springdoc) | Endpoints documentés et testables |
+| Sécurité | Spring Security, jetons JWT émis par Keycloak | Un étudiant ne modifie que son propre profil |
+| Résilience | Resilience4j (délai limite, repli) | Le service reste utilisable si un autre service est en panne |
+
+Le service a une seule base H2, qu'il est le seul à utiliser. Les autres services n'y accèdent jamais directement : ils passent par son API ou par ses événements.
+
+---
+
+## 3. Les classes
+
+| Classe | Attributs | Description |
+|---|---|---|
+| StudentProfile | id (Long), studentId (String), gpa (double), status (ProfileStatus), completionRate (int), updatedAt (LocalDateTime) | Le profil d'un étudiant. Il contient ses compétences, son style d'apprentissage, ses intérêts et ses réponses. `isComplete()` indique si le profil est complet |
+| SkillScore | id (Long), skill (SkillType), selfScore (int), adjustedScore (Integer) | Une compétence : auto-évaluation de 1 à 5 et ajustement éventuel de l'enseignant |
+| LearningStyle | id (Long), activeReflective (int), sensingIntuitive (int), visualVerbal (int), sequentialGlobal (int) | Les 4 dimensions du style d'apprentissage |
+| Interest | id (Long), label (String), category (String) | Un centre d'intérêt (thème, technologie, disponibilité) |
+| QuestionnaireAnswer | id (Long), questionCode (String), value (Integer) | La réponse d'un étudiant à une question du questionnaire |
+| CsvImport | id (Long), fileName (String), rowsImported (int), status (ImportStatus), importedBy (String) | Un lot de profils importé depuis un fichier CSV |
+
+Énumérations : `SkillType` (PROGRAMMING, DESIGN, WRITING, PROJECT_MANAGEMENT, PUBLIC_SPEAKING), `ProfileStatus` (EMPTY, IN_PROGRESS, COMPLETE), `ImportStatus` (PENDING, DONE, FAILED).
+
+Le diagramme de classes est dans `Documentation/Diagrams/profiling-class-diagram.png`.
+
+---
+
+## 4. Contrat d'API REST
+
+Toutes les routes passent par l'API Gateway, commencent par `/api` et exigent un jeton JWT valide. Swagger : `/swagger-ui.html`.
+
+| Méthode | URI | Rôle | Description | Codes de réponse |
+|---|---|---|---|---|
+| GET | /api/profiles/me | Étudiant | Consulter mon profil | 200, 401, 404 |
+| GET | /api/profiles/{studentId} | Étudiant, Enseignant | Consulter un profil | 200, 403, 404 |
+| GET | /api/profiles | Enseignant | Lister les profils (filtre `status`, pagination) | 200, 400, 403 |
+| POST | /api/profiles | Admin | Créer un profil | 201, 400, 409 (profil déjà existant) |
+| PUT | /api/profiles/{studentId} | Étudiant | Modifier son profil | 200, 400, 403, 404 |
+| DELETE | /api/profiles/{studentId} | Admin | Supprimer un profil et ses données | 204, 403, 404 |
+| PUT | /api/profiles/{studentId}/skills | Étudiant | Enregistrer l'auto-évaluation des compétences | 200, 400 (note hors 1 à 5), 404 |
+| PATCH | /api/profiles/{studentId}/skills/{skill}/adjustment | Enseignant | Ajuster la note d'une compétence | 200, 400, 403, 404 |
+| PUT | /api/profiles/{studentId}/interests | Étudiant | Choisir ses centres d'intérêt | 200, 400, 404 |
+| POST | /api/profiles/{studentId}/answers | Étudiant | Répondre au questionnaire de styles | 201, 400, 404 |
+| GET | /api/profiles/{studentId}/learning-style | Étudiant, Enseignant | Consulter le style d'apprentissage calculé | 200, 404 |
+| POST | /api/profiles/batch | Service ML | Récupérer les attributs normalisés d'une liste d'étudiants | 200, 400 (liste vide), 404 |
+| GET | /api/profiles/completion | Service Course / Group | Connaître les profils complets et incomplets | 200, 400 |
+| POST | /api/imports/csv | Enseignant | Importer un fichier CSV de profils | 202, 400 (CSV invalide), 415 (format non supporté) |
+| GET | /api/imports | Enseignant | Historique des imports | 200, 403 |
+| GET | /api/imports/{id} | Enseignant | Statut d'un import | 200, 404 |
+
+Signification des codes : 200 succès, 201 ressource créée, 202 demande acceptée et traitée ensuite, 204 supprimé sans contenu, 400 requête invalide, 401 jeton absent ou invalide, 403 rôle insuffisant, 404 ressource introuvable, 409 conflit avec l'état actuel, 415 format de fichier non supporté.
+
+---
+
+## 5. Interactions avec les autres microservices
+
+### Communication synchrone (OpenFeign)
+
+Le Profiling Service est appelé, il n'appelle aucun autre service. Il ne dépend donc de personne pour répondre.
+
+| Appelant | Appel | Pourquoi synchrone |
+|---|---|---|
+| ML Clustering Engine | `POST /api/profiles/batch` : on envoie les identifiants des étudiants, on reçoit leurs attributs normalisés | Le calcul a besoin des données immédiatement |
+| Course / Group Service | `GET /api/profiles/completion` : on reçoit les profils complets | Il faut savoir qui peut être inclus avant de lancer une constitution |
+| API Gateway (front Angular) | `/api/profiles/**` | Le front attend la réponse pour afficher l'écran |
+
+Si le Profiling Service est indisponible, l'appelant utilise un délai limite et un repli (Resilience4j) : il renvoie une erreur 503 claire et ne reste pas bloqué.
+
+### Communication asynchrone (RabbitMQ)
+
+| Événement | Sens | Autre service | Contenu | Effet |
+|---|---|---|---|---|
+| `user.registered` | consommé | Auth Service | identifiant de l'utilisateur, rôle | Création d'un profil vide (`EMPTY`) |
+| `profile.completed` | publié | Gamification Engine, Analytics Service | `studentId`, `completionRate`, date | Badge « Profil complété », indicateurs |
+| `profile.updated` | publié | Analytics Service | `studentId`, date | Mise à jour des indicateurs |
+
+Ces services n'ont pas besoin de répondre pour que l'opération réussisse, d'où le mode asynchrone. Si un consommateur est arrêté, le message reste dans la file RabbitMQ et il est traité à son retour. Un `user.registered` reçu deux fois pour le même étudiant est ignoré (traitement idempotent).
+
+---
+
+## 6. Lancement
+
+Prérequis : Java 17. Maven n'est pas à installer, le projet contient `mvnw`.
+
+```powershell
+cd Backend/profiling-service
+.\mvnw spring-boot:run
+```
+
+Sous Linux ou macOS : `./mvnw spring-boot:run`.
+
+| Ressource | URL |
+|---|---|
+| Service | http://localhost:8082 |
+| Console H2 | http://localhost:8082/h2-console |
+| Swagger | http://localhost:8082/swagger-ui.html |
+
+Console H2 : JDBC URL `jdbc:h2:mem:profilingdb`, utilisateur `sa`, mot de passe vide. La base est en mémoire : elle est recréée à chaque démarrage.
+
+---
+
+## 7. État d'avancement
+
+| Élément | État |
+|---|---|
+| Projet Spring Boot qui démarre | Fait |
+| Entités JPA et repositories (6 tables) | Fait |
+| Conception : diagramme de classes, API, événements | Fait |
+| Contrôleurs, services, DTO | À faire |
+| Swagger, Eureka, OpenFeign | À faire |
+| RabbitMQ, sécurité Keycloak | À faire |
+
+---
+
 
 
 
