@@ -1,0 +1,27 @@
+services:
+  mongodb-analytics:
+    image: mongo:7
+    container_name: mongodb-analytics
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    volumes:
+      - analytics_mongo_data:/data/db
+
+  analytics-service:
+    build: .
+    container_name: analytics-service
+    restart: unless-stopped
+    depends_on:
+      - mongodb-analytics
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      MONGODB_URI: mongodb://mongodb-analytics:27017/analytics_db
+      SERVER_PORT: 8085
+      LOCAL_HEADERS: "true"
+      EUREKA_ENABLED: "false"
+    ports:
+      - "8085:8085"
+
+volumes:
+  analytics_mongo_data:

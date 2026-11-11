@@ -1,0 +1,9 @@
+# Variante pour tester sans Eureka : service lancé sur le même ordinateur.
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: analytics-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/analytics/**

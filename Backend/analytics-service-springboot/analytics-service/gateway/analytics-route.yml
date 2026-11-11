@@ -1,0 +1,11 @@
+# À intégrer dans le fichier application.yml de votre API Gateway.
+# Si Eureka fonctionne, utilisez lb://analytics-service.
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: analytics-service
+          uri: lb://analytics-service
+          predicates:
+            - Path=/api/analytics/**
+          # Ne pas ajouter StripPrefix : le backend attend /api/analytics/...

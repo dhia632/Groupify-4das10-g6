@@ -1,0 +1,51 @@
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: analytics-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/analytics/**
+  application:
+    name: analytics-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27018/analytics_db}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+groupify:
+  security:
+    local-headers: ${LOCAL_HEADERS:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+groupify:
+  security:
+    local-headers: true
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:false}
+    register-with-eureka: ${EUREKA_ENABLED:false}
+    fetch-registry: ${EUREKA_ENABLED:false}
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
