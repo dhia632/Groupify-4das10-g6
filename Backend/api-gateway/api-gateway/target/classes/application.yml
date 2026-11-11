@@ -1,0 +1,107 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: api-gateway
+
+  config:
+    import: "optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:groupify}
+          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:groupify}/protocol/openid-connect/certs
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Évite les en-têtes CORS en double si un microservice en renvoie aussi
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+          routes:
+            # ---------------------------------------------------------------- Course / Group Service
+            - id: course-group-service
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/modules/**, /api/classes/**, /api/projects/**, /api/groups/**
+
+            - id: course-health
+              uri: http://localhost:8083
+              predicates:
+                - Path=/course-service/actuator/health
+              filters:
+                - StripPrefix=1
+
+            # ---------------------------------------------------------------- API REST du Gamification Service
+            - id: gamification-service
+              uri: lb://gamification-service
+              predicates:
+                - Path=/api/gamification/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: gamificationCB
+                    fallbackUri: forward:/fallback/gamification-service
+
+            # ---------------------------------------------------------------- Documentation OpenAPI du Gamification Service
+            # /docs/gamification/v3/api-docs  ->  gamification-service/v3/api-docs
+            - id: gamification-docs
+              uri: lb://gamification-service
+              predicates:
+                - Path=/docs/gamification/**
+              filters:
+                - RewritePath=/docs/gamification/(?<path>.*), /$\{path}
+
+            # ---------------------------------------------------------------- ML Clustering Engine (FastAPI)
+            - id: ml-clustering-engine
+              uri: http://localhost:8000
+              predicates:
+                - Path=/api/clustering/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+# Circuit breaker : la gateway coupe un service défaillant et répond par le fallback (503)
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 5s
+
+app:
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: gamification-service
+        url: /docs/gamification/v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      access: read_only

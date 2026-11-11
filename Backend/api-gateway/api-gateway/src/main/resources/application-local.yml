@@ -1,0 +1,61 @@
+# =====================================================================
+# Profil "local" de l'API Gateway : démo sans Docker.
+#  - Pas d'Eureka : les routes pointent directement sur les ports locaux
+#  - Pas de Keycloak : aucune vérification de jeton (voir LocalSecurityConfig)
+#  - Inchangé : CORS, CircuitBreaker + fallback 503, X-Correlation-Id
+# Le Gamification Service doit être lancé lui aussi avec le profil "local".
+# NE PAS utiliser en production.
+# =====================================================================
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    gateway:
+      server:
+        webflux:
+          routes:
+            # ---------------------------------------------------------------- Gamification Service
+            - id: gamification-service
+              uri: ${GAMIFICATION_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/gamification/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: gamificationCB
+                    fallbackUri: forward:/fallback/gamification-service
+
+            - id: gamification-docs
+              uri: ${GAMIFICATION_URL:http://localhost:8084}
+              predicates:
+                - Path=/docs/gamification/**
+              filters:
+                - RewritePath=/docs/gamification/(?<path>.*), /$\{path}
+
+            # ---------------------------------------------------------------- Course / Group Service
+            - id: course-group-service
+              uri: ${COURSE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/modules/**, /api/classes/**, /api/projects/**, /api/groups/**
+
+            - id: course-health
+              uri: ${COURSE_URL:http://localhost:8083}
+              predicates:
+                - Path=/course-service/actuator/health
+              filters:
+                - StripPrefix=1
+
+            # ---------------------------------------------------------------- ML Clustering Engine (FastAPI)
+            - id: ml-clustering-engine
+              uri: ${ML_URL:http://localhost:8000}
+              predicates:
+                - Path=/api/clustering/**
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.reactive.ReactiveOAuth2ResourceServerAutoConfiguration
+
+eureka:
+  client:
+    enabled: false

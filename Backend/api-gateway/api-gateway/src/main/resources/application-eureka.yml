@@ -1,0 +1,38 @@
+# =====================================================================
+# Profil "eureka" : à combiner avec "local" pour la démo sans Docker
+#   --spring.profiles.active=local,eureka
+# Garde le profil local (pas de Keycloak) mais les routes ne visent plus
+# http://localhost:8084 : la Gateway demande l'adresse à Eureka (lb://).
+# Cette liste de routes remplace celle du profil local.
+# =====================================================================
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: gamification-service
+              uri: lb://gamification-service
+              predicates:
+                - Path=/api/gamification/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: gamificationCB
+                    fallbackUri: forward:/fallback/gamification-service
+
+            - id: gamification-docs
+              uri: lb://gamification-service
+              predicates:
+                - Path=/docs/gamification/**
+              filters:
+                - RewritePath=/docs/gamification/(?<path>.*), /$\{path}
+
+eureka:
+  client:
+    enabled: true
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
