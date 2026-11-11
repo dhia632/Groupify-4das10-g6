@@ -883,7 +883,7 @@ un fichier `.env.example` sans secret.
 # 🏆 Gamification Service
 
 > Microservice individuel – Mini-projet AWD 2026-2027
-> **Responsable :** _Nom Prénom_ · **Stack :** Spring Boot 3 · MySQL 8 · Angular · Spring Cloud
+> **Responsable :** _Mariem Fezai_ · **Stack :** Spring Boot 3 · MySQL 8 · Angular · Spring Cloud
 
 ---
 
