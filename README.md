@@ -182,6 +182,307 @@ Ces services n'ont pas besoin de répondre pour que la publication réussisse, d
 
 
 
+
+
+# 📊 Groupify – Analytics Service
+
+## 1. Présentation du projet
+
+**Analytics Service** est un microservice de la plateforme **Groupify**, une application qui facilite la formation de groupes d'étudiants selon leurs profils, compétences et préférences.
+
+Ce microservice est responsable de la collecte, du traitement et de l'analyse des données statistiques liées aux étudiants, aux groupes et à leurs activités.
+
+Il permet notamment d'évaluer l'équilibre des groupes, de suivre l'engagement des étudiants et de générer des rapports statistiques.
+
+## 2. Objectifs du microservice
+
+Les principaux objectifs sont :
+
+- Analyser l'équilibre des groupes d'étudiants.
+- Mesurer le niveau d'engagement des étudiants.
+- Suivre les contributions des membres.
+- Fournir des statistiques sur les groupes et les promotions.
+- Générer des rapports analytiques.
+- Faciliter la prise de décision grâce aux données.
+
+## 3. Architecture du projet
+
+Le projet utilise une architecture microservices.
+
+```text
+                 Angular Frontend
+                        |
+                        v
+                   API Gateway
+                        |
+                        v
+                Analytics Service
+                        |
+              ---------------------
+              |                   |
+              v                   v
+           MongoDB              RabbitMQ
+```
+
+### Technologies utilisées
+
+| Technologie | Utilisation |
+|---|---|
+| Java | Langage de programmation |
+| Spring Boot | Développement du microservice |
+| Spring Data MongoDB | Accès à la base de données |
+| MongoDB | Stockage des données analytiques |
+| Spring Web | Création des API REST |
+| RabbitMQ | Communication asynchrone |
+| Eureka | Découverte des microservices, si activée |
+| Keycloak | Authentification et autorisation |
+| Docker | Conteneurisation |
+| Angular | Interface frontend |
+
+## 4. Fonctionnalités principales
+
+### 4.1 Group Balance
+
+Analyse l'équilibre des groupes selon les informations disponibles sur les étudiants.
+
+Exemples d'indicateurs :
+
+- Répartition des compétences.
+- Répartition des étudiants.
+- Équilibre entre les membres.
+- Score d'équilibre du groupe.
+
+### 4.2 Student Engagement
+
+Permet de suivre la participation des étudiants dans leurs groupes.
+
+Exemples d'indicateurs :
+
+- Nombre de contributions.
+- Participation aux activités.
+- Niveau d'engagement.
+- Évolution de la participation.
+
+### 4.3 Promotion Summary
+
+Fournit une vue globale des statistiques d'une promotion.
+
+Exemples :
+
+- Nombre total d'étudiants.
+- Nombre de groupes formés.
+- Moyenne des scores d'équilibre.
+- Statistiques de participation.
+
+### 4.4 Reports
+
+Permet de consulter les rapports analytiques générés à partir des données disponibles.
+
+## 5. API REST
+
+Le préfixe des endpoints est :
+
+```text
+/api/analytics
+```
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/courses/{id}/balance` | Consulter l'équilibre des groupes d'un cours |
+| GET | `/courses/{id}/engagement` | Consulter les statistiques d'engagement |
+| GET | `/promotions/{id}/summary` | Consulter le résumé statistique d'une promotion |
+| GET | `/reports` | Consulter les rapports disponibles |
+
+**Exemple de requête :**
+
+```http
+GET /api/analytics/courses/1/balance
+```
+
+Les réponses sont retournées au format JSON.
+
+## 6. Communication entre microservices
+
+Analytics Service peut communiquer avec les autres microservices de deux manières.
+
+### 6.1 Communication synchrone – REST API
+
+Les autres services peuvent envoyer des requêtes HTTP pour récupérer des informations.
+
+```text
+Angular
+   |
+   v
+API Gateway
+   |
+   v
+Analytics Service
+   |
+   v
+MongoDB
+   |
+   v
+JSON Response
+```
+
+### 6.2 Communication asynchrone – RabbitMQ
+
+Les autres services peuvent publier des événements que Analytics Service consomme sans bloquer le traitement initial.
+
+Exemples d'événements envisagés :
+
+| Événement | Service source |
+|---|---|
+| `group.formed` | Course / Group Service |
+| `profile.updated` | User / Profiling Service |
+| `contribution.recorded` | Course / Group Service |
+| `badge.awarded` | Gamification Service |
+
+Les noms et les formats des événements doivent être harmonisés avec les autres membres de l'équipe.
+
+## 7. Base de données
+
+Analytics Service utilise **MongoDB** pour stocker les données nécessaires aux analyses.
+
+Base de données proposée :
+
+```text
+analytics_db
+```
+
+Exemple de configuration dans `application.properties` :
+
+```properties
+spring.application.name=analytics-service
+server.port=8085
+spring.data.mongodb.uri=mongodb://localhost:27018/analytics_db
+```
+
+Les collections dépendent des entités réellement implémentées dans le projet.
+
+## 8. Installation et lancement
+
+### Prérequis
+
+Avant de lancer le microservice, installer :
+
+- Java (version compatible avec le projet).
+- MongoDB.
+- IntelliJ IDEA, Eclipse ou Spring Tool Suite.
+- Maven ou Maven Wrapper.
+
+### Étape 1 : Cloner le projet
+
+```bash
+git clone <URL_DU_REPOSITORY>
+```
+
+### Étape 2 : Accéder au dossier
+
+```bash
+cd analytics-service
+```
+
+### Étape 3 : Configurer MongoDB
+
+Vérifier que MongoDB est démarré et que l'URI configurée dans `application.properties` correspond à ton environnement.
+
+### Étape 4 : Lancer le microservice
+
+Avec Maven :
+
+```bash
+mvn spring-boot:run
+```
+
+Avec Maven Wrapper sous Windows :
+
+```bash
+.\mvnw.cmd spring-boot:run
+```
+
+Avec Maven Wrapper sous Linux ou macOS :
+
+```bash
+./mvnw spring-boot:run
+```
+
+Il est également possible d'importer le projet comme projet Maven dans IntelliJ IDEA ou Eclipse et de lancer la classe principale `AnalyticsServiceApplication`.
+
+## 9. Configuration
+
+Exemple de configuration locale :
+
+```properties
+spring.application.name=analytics-service
+server.port=8085
+
+spring.data.mongodb.uri=mongodb://localhost:27018/analytics_db
+
+eureka.client.enabled=false
+```
+
+Adapter les propriétés selon les dépendances et les profils réellement configurés dans le projet.
+
+Ne jamais publier les mots de passe, les clés secrètes ou les informations sensibles dans GitHub.
+
+## 10. Tests
+
+Les tests peuvent couvrir les éléments suivants :
+
+- Calcul du score d'équilibre des groupes.
+- Calcul des statistiques d'engagement.
+- Récupération des statistiques d'une promotion.
+- Vérification des endpoints REST.
+- Vérification de la communication avec MongoDB.
+- Traitement des événements RabbitMQ.
+
+Exécuter les tests avec :
+
+```bash
+mvn test
+```
+
+Ou avec Maven Wrapper :
+
+```bash
+.\mvnw.cmd test
+```
+
+## 11. Structure du projet
+
+Exemple d'organisation recommandée :
+
+```text
+analytics-service/
+│
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── .../
+│   │   │       ├── controller/
+│   │   │       ├── service/
+│   │   │       ├── repository/
+│   │   │       ├── model/
+│   │   │       ├── dto/
+│   │   │       ├── config/
+│   │   │       └── AnalyticsServiceApplication.java
+│   │   │
+│   │   └── resources/
+│   │       └── application.properties
+│   │
+│   └── test/
+│
+├── pom.xml
+└── README.md
+```
+
+Cette structure est indicative et doit être adaptée à l'organisation réelle du code.
+
+
+
+
+
 ---
 # ML-Clustering-Engine
 
