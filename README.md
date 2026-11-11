@@ -63,8 +63,8 @@ Chaque étudiant renseigne un profil multi-critères. Un moteur d'apprentissage 
   +-----------+ +-----------+ +-----------+ +-----------+ +-----------+ +-----------+
   |   Auth    | |   User /  | |  Course / | |    ML     | |Gamification| | Analytics |
   |  Service  | | Profiling | |   Group   | | Clustering| |   Engine   | |  Service  |
-  | (Keycloak)| | (Spring)  | |(Spring,   | | (Python,  | | (Spring)   | | (Spring)  |
-  |           | |           | |  MySQL)   | |  FastAPI) | |            | |           |
+  | (Spring + | | (Spring)  | |(Spring,   | | (Python,  | | (Spring)   | | (Spring)  |
+  | Keycloak) | |           | |  MySQL)   | |  FastAPI) | |            | |           |
   +-----------+ +-----------+ +-----------+ +-----------+ +-----------+ +-----------+
                                        \________ REST / OpenFeign ________/
                                        \__ événements : Kafka ou RabbitMQ __/
@@ -79,6 +79,130 @@ Principes :
 
 ---
 
+
+# Auth Service
+
+Le **Auth Service** est le microservice chargé de l'inscription et de la gestion des comptes et des rôles de Groupify. Il s'appuie sur **Keycloak** pour l'identité et l'authentification des utilisateurs.
+
+**Responsabilités principales :**
+- gérer l'inscription des utilisateurs ;
+- gérer les comptes et les rôles de la plateforme ;
+- assurer le lien avec Keycloak ;
+- publier l'événement `user.registered` après l'inscription afin que les autres services puissent réagir.
+
+### 1. Choix technologiques
+
+| Élément | Choix indiqué dans l'architecture | Rôle |
+|---|---|---|
+| Base de données | H2 | Base associée au Auth Service |
+| Port | `8081` | Port du microservice |
+| Gestion des identités | Keycloak | Comptes, rôles et authentification |
+| Sécurité | OAuth2 / OpenID Connect et JWT | Authentification et transmission de l'identité |
+| Messagerie | RabbitMQ | Publication de l'événement `user.registered` |
+
+La présentation identifie H2 comme base du Auth Service. Elle ne précise pas le schéma des tables ni les entités persistées : ces détails ne sont donc pas spécifiés ici.
+
+### 2. Rôles de la plateforme
+
+Keycloak centralise les rôles utilisés par Groupify :
+
+| Rôle | Description |
+|---|---|
+| `STUDENT` | Utilisateur étudiant |
+| `TEACHER` | Utilisateur enseignant |
+| `ADMIN` | Administrateur de la plateforme |
+
+Ces rôles servent à contrôler l'accès aux fonctionnalités et aux opérations protégées.
+
+### 3. Authentification et sécurité
+
+L'authentification repose sur Keycloak et le mécanisme OAuth2 / OpenID Connect :
+
+1. L'utilisateur s'inscrit via le parcours d'inscription de Groupify. Le Auth Service gère cette opération et son lien avec Keycloak.
+2. Lors de l'authentification, le front-end obtient auprès de Keycloak un jeton JWT.
+3. Le front-end transmet ce jeton lors des appels vers les API, via l'en-tête `Authorization: Bearer <JWT>`.
+4. L'API Gateway refuse toute requête qui ne présente pas de jeton valide : elle renvoie `401 Unauthorized`.
+5. Chaque microservice vérifie également les rôles nécessaires à l'opération, notamment avec `@PreAuthorize`.
+
+La sécurité est donc appliquée à deux niveaux : contrôle du jeton à l'entrée par la Gateway, puis contrôle des autorisations dans le microservice concerné.
+
+Pour les échanges techniques entre microservices, l'architecture prévoit un jeton OAuth2 de type `client_credentials`.
+
+```text
+Utilisateur
+    |
+    v
+Frontend Angular
+    |
+    | Authentification
+    v
+Keycloak
+    |
+    | JWT (identité et rôles)
+    v
+Frontend Angular
+    |
+    | Authorization: Bearer <JWT>
+    v
+API Gateway
+    |
+    | Vérification du jeton
+    | Jeton absent ou invalide : 401
+    v
+Microservice cible
+    |
+    | Vérification des rôles (@PreAuthorize)
+    v
+Ressource protégée
+```
+
+### 4. Communication avec le User / Profiling Service
+
+Après une inscription, le Auth Service publie l'événement `user.registered` via RabbitMQ. Le User / Profiling Service le consomme pour initialiser le profil de l'utilisateur étudiant.
+
+| Élément | Description |
+|---|---|
+| Événement | `user.registered` |
+| Producteur | Auth Service |
+| Consommateur | User / Profiling Service |
+| Données mentionnées dans le scénario | Utilisateur inscrit et rôle associé |
+| Traitement attendu | Création d'un profil étudiant vide (`EMPTY`) pour un nouvel étudiant |
+
+Cette communication est asynchrone : le Auth Service publie l'événement sans attendre la fin du traitement par le Profiling Service.
+
+```mermaid
+sequenceDiagram
+    participant U as Utilisateur
+    participant A as Auth Service
+    participant K as Keycloak
+    participant MQ as RabbitMQ
+    participant P as User / Profiling Service
+
+    U->>A: Inscription
+    A->>K: Gestion du compte / lien identité
+    K-->>A: Identité et rôles
+    A->>MQ: Publier user.registered
+    MQ-->>P: Consommer user.registered
+    P->>P: Créer le profil étudiant EMPTY
+```
+
+Le traitement de l'événement doit éviter de créer plusieurs profils pour une même inscription si le message est reçu de nouveau. Le contrat détaillé du message (noms et types de tous les champs) n'est pas fourni dans les documents de conception.
+
+### 5. Place du Auth Service dans le scénario global
+
+Le scénario présenté dans le PowerPoint commence par l'inscription :
+
+1. **Auth Service** : inscription et publication de `user.registered`.
+2. **Profiling Service** : initialisation du profil, puis événement `profile.completed` lorsque le profil est complété.
+3. **Course / Group Service** : demande de constitution des groupes.
+4. **ML Clustering Engine** : calcul de la répartition.
+5. **Course / Group Service** : validation par l'enseignant et publication de `groups.published`.
+6. **Gamification Service** : attribution des badges et des points, puis publication de `team.points.updated`.
+7. **Analytics Service** : calcul des indicateurs d'équilibre et d'engagement.
+
+Le Auth Service intervient donc au début du cycle de vie de l'utilisateur ; les données pédagogiques du profil restent sous la responsabilité du User / Profiling Service.
+
+---
 
 # Course / Group Service
 
